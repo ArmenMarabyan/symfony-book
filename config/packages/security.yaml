@@ -17,6 +17,8 @@ security:
             lazy: true
             provider: app_user_provider
             custom_authenticator: App\Security\AppAuthenticator
+            http_basic: { realm: Admin Area }
+            entry_point: App\Security\AppAuthenticator
             logout:
                 path: app_logout
                 # where to redirect after logout

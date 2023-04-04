@@ -13,19 +13,22 @@ use Psr\Log\LoggerInterface;
 use Symfony\Bridge\Twig\Mime\NotificationEmail;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Mailer\MailerInterface;
+use App\ImageOptimizer;
 
 #[AsMessageHandler]
 class CommentMessageHandler
 {
     public function __construct(
-        private EntityManagerInterface $entityManager,
-        private SpamChecker            $spamChecker,
-        private CommentRepository      $commentRepository,
-        private MessageBusInterface    $bus,
-        private WorkflowInterface      $commentStateMachine,
-        private MailerInterface        $mailer,
+        private EntityManagerInterface              $entityManager,
+        private SpamChecker                         $spamChecker,
+        private CommentRepository                   $commentRepository,
+        private MessageBusInterface                 $bus,
+        private WorkflowInterface                   $commentStateMachine,
+        private MailerInterface                     $mailer,
         #[Autowire('%admin_email%')] private string $adminEmail,
-        private ?LoggerInterface       $logger = null,
+        private ImageOptimizer                      $imageOptimizer,
+        #[Autowire('%photo_dir%')] private string   $photoDir,
+        private ?LoggerInterface                    $logger = null,
     )
     {
     }
@@ -55,6 +58,12 @@ class CommentMessageHandler
                 ->to($this->adminEmail)
                 ->context(['comment' => $comment])
             );
+        } elseif ($this->commentStateMachine->can($comment, 'optimize')) {
+            if ($comment->getPhotoFilename()) {
+                $this->imageOptimizer->resize($this->photoDir . '/' . $comment->getPhotoFilename());
+            }
+            $this->commentStateMachine->apply($comment, 'optimize');
+            $this->entityManager->flush();
         } elseif ($this->logger) {
             $this->logger->debug('Dropping comment message', ['comment' => $comment->getId(), 'state' => $comment->getState()]);
         }

@@ -16,6 +16,8 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\File\Exception\FileException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use App\Message\CommentMessage;
+use Symfony\Component\Notifier\Notification\Notification;
+use Symfony\Component\Notifier\NotifierInterface;
 
 class ConferenceController extends AbstractController
 {
@@ -45,6 +47,7 @@ class ConferenceController extends AbstractController
         Request $request,
         Conference $conference,
         CommentRepository $commentRepository,
+        NotifierInterface $notifier,
         #[Autowire('%photo_dir%')] string $photoDir,
     ): Response {
 
@@ -79,7 +82,13 @@ class ConferenceController extends AbstractController
 
             $this->bus->dispatch(new CommentMessage($comment->getId(), $context));
 
+            $notifier->send(new Notification('Thank you for the feedback; your comment will be posted after moderation.', ['browser']));
+
             return $this->redirectToRoute('conference', ['slug' => $conference->getSlug()]);
+        }
+
+        if ($form->isSubmitted()) {
+            $notifier->send(new Notification('Can you check your submission? There are some problems with it.', ['browser']));
         }
 
         return $this->render('conference/show.html.twig', [
